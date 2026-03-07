@@ -5,7 +5,7 @@ import {
   loanApplications,
   applicationBanks,
 } from "./schema";
-import { eq, count, desc, and, sql } from "drizzle-orm";
+import { eq, count, desc, and, sql, gte } from "drizzle-orm";
 
 export async function getDashboardStats() {
   const [[totalApps], [activeBanks], [pendingApps], [approvedApps]] =
@@ -178,6 +178,121 @@ export async function getBankDashboardStats(bankId: string) {
     reviewing: Number(reviewing.count),
     approved: Number(approved.count),
     rejected: Number(rejected.count),
+  };
+}
+
+export async function getBankAnalytics(bankId: string) {
+  const [deviceRows, browserRows, langRows, dailyRows] = await Promise.all([
+    // Device breakdown
+    db
+      .select({
+        deviceType: loanApplications.deviceType,
+        count: count(),
+      })
+      .from(applicationBanks)
+      .innerJoin(loanApplications, eq(applicationBanks.applicationId, loanApplications.id))
+      .where(eq(applicationBanks.bankId, bankId))
+      .groupBy(loanApplications.deviceType),
+
+    // Browser breakdown (top 6)
+    db
+      .select({
+        browser: loanApplications.browser,
+        count: count(),
+      })
+      .from(applicationBanks)
+      .innerJoin(loanApplications, eq(applicationBanks.applicationId, loanApplications.id))
+      .where(eq(applicationBanks.bankId, bankId))
+      .groupBy(loanApplications.browser)
+      .orderBy(desc(count()))
+      .limit(6),
+
+    // Language breakdown
+    db
+      .select({
+        language: loanApplications.language,
+        count: count(),
+      })
+      .from(applicationBanks)
+      .innerJoin(loanApplications, eq(applicationBanks.applicationId, loanApplications.id))
+      .where(eq(applicationBanks.bankId, bankId))
+      .groupBy(loanApplications.language)
+      .orderBy(desc(count())),
+
+    // Daily applications for last 30 days
+    db
+      .select({
+        date: sql<string>`DATE(${applicationBanks.createdAt})`,
+        count: count(),
+      })
+      .from(applicationBanks)
+      .where(
+        and(
+          eq(applicationBanks.bankId, bankId),
+          gte(applicationBanks.createdAt, sql`NOW() - INTERVAL '30 days'`)
+        )
+      )
+      .groupBy(sql`DATE(${applicationBanks.createdAt})`)
+      .orderBy(sql`DATE(${applicationBanks.createdAt})`),
+  ]);
+
+  return {
+    devices: deviceRows.map((r) => ({ deviceType: r.deviceType ?? "desktop", count: Number(r.count) })),
+    browsers: browserRows.map((r) => ({ browser: r.browser ?? "Unknown", count: Number(r.count) })),
+    languages: langRows.map((r) => ({ language: r.language ?? "–", count: Number(r.count) })),
+    daily: dailyRows.map((r) => ({ date: r.date, count: Number(r.count) })),
+  };
+}
+
+export async function getPlatformAnalytics() {
+  const [deviceRows, dailyRows, bankRows] = await Promise.all([
+    // Device breakdown across all applications
+    db
+      .select({
+        deviceType: loanApplications.deviceType,
+        count: count(),
+      })
+      .from(loanApplications)
+      .groupBy(loanApplications.deviceType),
+
+    // Daily new applications for last 30 days
+    db
+      .select({
+        date: sql<string>`DATE(${loanApplications.createdAt})`,
+        count: count(),
+      })
+      .from(loanApplications)
+      .where(gte(loanApplications.createdAt, sql`NOW() - INTERVAL '30 days'`))
+      .groupBy(sql`DATE(${loanApplications.createdAt})`)
+      .orderBy(sql`DATE(${loanApplications.createdAt})`),
+
+    // Per-bank: total, approved, rejected
+    db
+      .select({
+        bankId: banks.id,
+        bankName: banks.name,
+        total: count(),
+        approved: sql<number>`COUNT(*) FILTER (WHERE ${applicationBanks.status} = 'tesdiq_edildi')`,
+        rejected: sql<number>`COUNT(*) FILTER (WHERE ${applicationBanks.status} = 'red_edildi')`,
+        pending: sql<number>`COUNT(*) FILTER (WHERE ${applicationBanks.status} = 'gozlemede')`,
+      })
+      .from(applicationBanks)
+      .innerJoin(banks, eq(applicationBanks.bankId, banks.id))
+      .groupBy(banks.id, banks.name)
+      .orderBy(desc(count())),
+  ]);
+
+  return {
+    devices: deviceRows.map((r) => ({ deviceType: r.deviceType ?? "desktop", count: Number(r.count) })),
+    daily: dailyRows.map((r) => ({ date: r.date, count: Number(r.count) })),
+    banks: bankRows.map((r) => ({
+      bankId: r.bankId,
+      bankName: r.bankName,
+      total: Number(r.total),
+      approved: Number(r.approved),
+      rejected: Number(r.rejected),
+      pending: Number(r.pending),
+    })),
   };
 }
 
