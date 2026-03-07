@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBankBySlug, getBankAdmins } from "@/db/queries";
 import { CreateAdminForm } from "./CreateAdminForm";
-import { deleteBankAdminAction } from "@/lib/actions/banks";
+import { DeleteAdminButton } from "./DeleteAdminButton";
 
 export default async function BankAdminsPage({
   params,
@@ -72,22 +72,7 @@ export default async function BankAdminsPage({
                   >
                     {admin.isActive ? "Aktiv" : "Deaktiv"}
                   </span>
-                  <form
-                    action={async () => {
-                      "use server";
-                      await deleteBankAdminAction(admin.id, slug);
-                    }}
-                  >
-                    <button
-                      type="submit"
-                      className="rounded-lg px-2 py-1 text-xs text-red-400 transition hover:bg-red-50 hover:text-red-600"
-                      onClick={(e) => {
-                        if (!confirm("Bu admini silmək istəyirsiniz?")) e.preventDefault();
-                      }}
-                    >
-                      Sil
-                    </button>
-                  </form>
+                  <DeleteAdminButton adminId={admin.id} slug={slug} />
                 </div>
               </div>
             ))}
