@@ -11,9 +11,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
-  // Auth — super admin only
+  // Auth — super admin or bank admin
   const session = await getSession();
-  if (!session || session.role !== "super_admin") {
+  if (!session) {
     return NextResponse.json({ error: "İcazəsiz" }, { status: 401 });
   }
 
@@ -23,13 +23,19 @@ export async function GET(req: NextRequest) {
   const dateFrom = searchParams.get("dateFrom");
   const dateTo = searchParams.get("dateTo");
 
-  if (!slug) {
-    return NextResponse.json({ error: "slug tələb olunur" }, { status: 400 });
-  }
+  let bank: Awaited<ReturnType<typeof getBankBySlug>>;
 
-  const bank = await getBankBySlug(slug);
-  if (!bank) {
-    return NextResponse.json({ error: "Bank tapılmadı" }, { status: 404 });
+  if (session.role === "super_admin") {
+    if (!slug) return NextResponse.json({ error: "slug tələb olunur" }, { status: 400 });
+    bank = await getBankBySlug(slug);
+    if (!bank) return NextResponse.json({ error: "Bank tapılmadı" }, { status: 404 });
+  } else {
+    // bank_admin — can only export own bank, slug must match
+    if (slug && slug !== session.bankSlug) {
+      return NextResponse.json({ error: "İcazəsiz" }, { status: 403 });
+    }
+    bank = await getBankBySlug(session.bankSlug);
+    if (!bank) return NextResponse.json({ error: "Bank tapılmadı" }, { status: 404 });
   }
 
   // Parse status filter

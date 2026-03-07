@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { getBankApplications } from "@/db/queries";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ApplicationActions } from "./ApplicationActions";
+import { ExportSection } from "./ExportSection";
 
 export default async function BankApplicationsPage() {
   const session = await getSession();
@@ -19,20 +20,23 @@ export default async function BankApplicationsPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Müraciətlər</h1>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {[
-            { label: "Gözlənilir", count: counts.gozlemede, color: "bg-amber-50 text-amber-700" },
-            { label: "Baxılır", count: counts.baxilir, color: "bg-blue-50 text-blue-700" },
-            { label: "Təsdiq", count: counts.tesdiq_edildi, color: "bg-emerald-50 text-emerald-700" },
-            { label: "Rədd", count: counts.red_edildi, color: "bg-red-50 text-red-700" },
-          ].map((s) => (
-            <span key={s.label} className={`rounded-full px-3 py-1 text-xs font-medium ${s.color}`}>
-              {s.label}: {s.count}
-            </span>
-          ))}
+      <div className="relative mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Müraciətlər</h1>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[
+              { label: "Gözlənilir", count: counts.gozlemede, color: "bg-amber-50 text-amber-700" },
+              { label: "Baxılır", count: counts.baxilir, color: "bg-blue-50 text-blue-700" },
+              { label: "Təsdiq", count: counts.tesdiq_edildi, color: "bg-emerald-50 text-emerald-700" },
+              { label: "Rədd", count: counts.red_edildi, color: "bg-red-50 text-red-700" },
+            ].map((s) => (
+              <span key={s.label} className={`rounded-full px-3 py-1 text-xs font-medium ${s.color}`}>
+                {s.label}: {s.count}
+              </span>
+            ))}
+          </div>
         </div>
+        <ExportSection bankSlug={session.bankSlug} />
       </div>
 
       <div className="rounded-xl bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
